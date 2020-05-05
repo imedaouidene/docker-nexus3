@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/ubi
+FROM registry.access.redhat.com/rhel7/rhel
 
 LABEL name="Nexus Repository Manager" \
       maintainer="Sonatype <support@sonatype.com>" \
@@ -54,19 +54,18 @@ ARG NEXUS_REPOSITORY_MANAGER_COOKBOOK_URL="https://github.com/sonatype/chef-nexu
 ADD solo.json.erb /var/chef/solo.json.erb
 
 # Install using chef-solo
-# Chef version locked to avoid needing to accept the EULA on behalf of whomever builds the image
-RUN yum install -y --disableplugin=subscription-manager hostname procps \
-    && curl -L https://www.getchef.com/chef/install.sh | bash -s -- -v 14.12.9 \
+RUN curl -L https://www.getchef.com/chef/install.sh | bash \
     && /opt/chef/embedded/bin/erb /var/chef/solo.json.erb > /var/chef/solo.json \
     && chef-solo \
+       --node_name nexus_repository_red_hat_docker_build \
        --recipe-url ${NEXUS_REPOSITORY_MANAGER_COOKBOOK_URL} \
        --json-attributes /var/chef/solo.json \
     && rpm -qa *chef* | xargs rpm -e \
+    && rpm --rebuilddb \
     && rm -rf /etc/chef \
     && rm -rf /opt/chefdk \
     && rm -rf /var/cache/yum \
-    && rm -rf /var/chef \
-    && yum clean all
+    && rm -rf /var/chef
 
 VOLUME ${NEXUS_DATA}
 
@@ -75,4 +74,5 @@ USER nexus
 
 ENV INSTALL4J_ADD_VM_PARAMS="-Xms1200m -Xmx1200m -XX:MaxDirectMemorySize=2g -Djava.util.prefs.userRoot=${NEXUS_DATA}/javaprefs"
 
+ENTRYPOINT ["/uid_entrypoint.sh"]
 CMD ["sh", "-c", "${SONATYPE_DIR}/start-nexus-repository-manager.sh"]
